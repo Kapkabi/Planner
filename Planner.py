@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 from tkcalendar import Calendar
+from tkcalendar import DateEntry
 from datetime import datetime, timedelta
 import json
 import os
@@ -9,13 +10,15 @@ import shutil
 import csv
 
 class Task:
-    def __init__(self, title, due_date, category="Без категории", comment="", time_spent=0):
+    def __init__(self, title, due_date, category="Без категории", comment="", time_spent=0, importance=False, urgency=False):
         self.title = title
         self.due_date = due_date
         self.category = category
         self.completed = False
         self.comment = comment
         self.time_spent = time_spent  # Время в секундах
+        self.importance = importance  # True = Важно, False = Не важно
+        self.urgency = urgency  # True = Срочно, False = Не срочно
 
     def __str__(self):
         status = "✓" if self.completed else "✗"
@@ -49,7 +52,7 @@ class PlannerApp:
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_columnconfigure(2, weight=1)
-        self.root.grid_columnconfigure(3, weight=1)  # Добавляем растяжение для третьего столбца
+        self.root.grid_columnconfigure(3, weight=1)
 
         # Поиск
         tk.Label(root, text="Поиск:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
@@ -58,30 +61,9 @@ class PlannerApp:
         tk.Button(root, text="Найти", command=self.search).grid(row=0, column=2, padx=5, pady=5)
         tk.Button(root, text="Показать всё", command=self.reset_search).grid(row=0, column=3, padx=5, pady=5)
 
-        # Поля ввода для задач
-        tk.Label(root, text="Название задачи:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-        self.title_entry = tk.Entry(root)
-        self.title_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-
-        tk.Button(root, text="Сегодня", command=self.set_today).grid(row=2, column=0, padx=5, pady=5)
-        tk.Button(root, text="Выбрать дату", command=self.open_calendar).grid(row=2, column=1, padx=5, pady=5)
-
-        self.due_date_var = tk.StringVar(value="Дата не выбрана")
-        tk.Label(root, textvariable=self.due_date_var).grid(row=3, column=0, columnspan=2, pady=5)
-
-        tk.Label(root, text="Категория:").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-        self.category_var = tk.StringVar(value="Без категории")
-        self.category_menu = tk.OptionMenu(root, self.category_var, *self.categories)
-        self.category_menu.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
-        tk.Button(root, text="Добавить категорию", command=self.add_category).grid(row=4, column=2, padx=5, pady=5)
-
-        tk.Button(root, text="Добавить задачу", command=self.add_task).grid(row=5, column=0, columnspan=2, pady=5)
-
-        tk.Button(root, text="Отметить выполненной", command=self.complete_task).grid(row=6, column=0, padx=5, pady=5)
-        tk.Button(root, text="Удалить задачу", command=self.delete_task).grid(row=6, column=1, padx=5, pady=5)
-        tk.Button(root, text="Комментарий", command=self.edit_task_comment).grid(row=6, column=2, padx=5, pady=5)
-
-        self.task_tree = ttk.Treeview(root, columns=("Title", "Due Date", "Category", "Status", "Comment", "Time"),
+        # Таблица задач
+        self.task_tree = ttk.Treeview(root, columns=(
+        "Title", "Due Date", "Category", "Status", "Comment", "Time", "Priority"),
                                       show="headings", height=10)
         self.task_tree.heading("Title", text="Задача")
         self.task_tree.heading("Due Date", text="Срок")
@@ -89,20 +71,27 @@ class PlannerApp:
         self.task_tree.heading("Status", text="Статус")
         self.task_tree.heading("Comment", text="Комментарий")
         self.task_tree.heading("Time", text="Время")
-        self.task_tree.column("Title", width=300, stretch=True)  # Уменьшаем, чтобы уместить новую колонку
-        self.task_tree.column("Due Date", width=200, stretch=True)
-        self.task_tree.column("Category", width=150, stretch=True)
+        self.task_tree.heading("Priority", text="Приоритет")  # Новая колонка
+        self.task_tree.column("Title", width=250, stretch=True)
+        self.task_tree.column("Due Date", width=150, stretch=True)
+        self.task_tree.column("Category", width=120, stretch=True)
         self.task_tree.column("Status", width=80, stretch=True)
         self.task_tree.column("Comment", width=50, stretch=True)
-        self.task_tree.column("Time", width=100, stretch=True)  # Новая колонка
-        self.task_tree.grid(row=7, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
+        self.task_tree.column("Time", width=100, stretch=True)
+        self.task_tree.column("Priority", width=80, anchor="center")  # Новая колонка
+        self.task_tree.grid(row=1, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
         self.task_tree.tag_configure("overdue", foreground="red")
         self.task_tree.bind("<Double-1>", self.on_task_double_click)
-        self.update_task_table()
+
+        # Кнопки для задач
+        tk.Button(root, text="Добавить задачу", command=self.add_task_window).grid(row=2, column=0, padx=5, pady=5)
+        tk.Button(root, text="Отметить выполненной", command=self.complete_task).grid(row=2, column=1, padx=5, pady=5)
+        tk.Button(root, text="Удалить задачу", command=self.delete_task).grid(row=2, column=2, padx=5, pady=5)
+        tk.Button(root, text="Комментарий", command=self.edit_task_comment).grid(row=2, column=3, padx=5, pady=5)
 
         # Таймер Помидоро
-        tk.Button(root, text="Запустить таймер", command=self.start_pomodoro).grid(row=8, column=0, padx=5, pady=5)
-        tk.Button(root, text="Статистика таймера", command=self.show_pomodoro_stats).grid(row=8, column=1, padx=5,
+        tk.Button(root, text="Запустить таймер", command=self.start_pomodoro).grid(row=3, column=0, padx=5, pady=5)
+        tk.Button(root, text="Статистика таймера", command=self.show_pomodoro_stats).grid(row=3, column=1, padx=5,
                                                                                           pady=5)
 
         self.timer_running = False
@@ -114,32 +103,35 @@ class PlannerApp:
         self.original_work_seconds = 25 * 60
         self.original_rest_seconds = 5 * 60
         self.is_work_phase = True
-        self.work_time_spent = 0  # Добавляем атрибут класса
-        self.total_work_time = 0  # Добавляем для накопления общего времени
+        self.work_time_spent = 0
+        self.total_work_time = 0
 
         # Настройка напоминаний
-        tk.Label(root, text="Напоминание за:").grid(row=8, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(root, text="Напоминание за:").grid(row=3, column=2, padx=5, pady=5, sticky="e")
         self.reminder_var = tk.StringVar(value="10")
-        tk.OptionMenu(root, self.reminder_var, "5", "10", "30", "60").grid(row=8, column=3, padx=5, pady=5, sticky="w")
+        tk.OptionMenu(root, self.reminder_var, "5", "10", "30", "60").grid(row=3, column=3, padx=5, pady=5, sticky="w")
 
-        tk.Button(root, text="Добавить заметку", command=self.open_note_window).grid(row=11, column=0, padx=5, pady=5)
-        tk.Button(root, text="Редактировать заметку", command=self.edit_note).grid(row=11, column=1, padx=5, pady=5)
-        tk.Button(root, text="Удалить заметку", command=self.delete_note).grid(row=12, column=0, padx=5, pady=5)
-        tk.Button(root, text="Восстановить из резерва", command=self.restore_from_backup).grid(row=12, column=1, padx=5, pady=5)
-        tk.Button(root, text="Экспорт в CSV", command=self.export_to_csv).grid(row=12, column=2, padx=5, pady=5)
+        # Заметки
+        tk.Button(root, text="Добавить заметку", command=self.open_note_window).grid(row=4, column=0, padx=5, pady=5)
+        tk.Button(root, text="Редактировать заметку", command=self.edit_note).grid(row=4, column=1, padx=5, pady=5)
+        tk.Button(root, text="Удалить заметку", command=self.delete_note).grid(row=4, column=2, padx=5, pady=5)
+        tk.Button(root, text="Восстановить из резерва", command=self.restore_from_backup).grid(row=5, column=0, padx=5,
+                                                                                               pady=5)
+        tk.Button(root, text="Экспорт в CSV", command=self.export_to_csv).grid(row=5, column=1, padx=5, pady=5)
 
         self.note_tree = ttk.Treeview(root, columns=("Title", "Date", "Category"), show="headings", height=5)
         self.note_tree.heading("Title", text="Заголовок заметки")
         self.note_tree.heading("Date", text="Дата")
         self.note_tree.heading("Category", text="Категория")
-        self.note_tree.column("Title", width=450, stretch=True)  # Увеличиваем ширину
+        self.note_tree.column("Title", width=450, stretch=True)
         self.note_tree.column("Date", width=150, stretch=True)
         self.note_tree.column("Category", width=150, stretch=True)
-        self.note_tree.grid(row=13, column=0, columnspan=4, padx=5, pady=5, sticky="ew")  # Расширяем на 4 столбца
+        self.note_tree.grid(row=6, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
         self.note_tree.bind("<Double-1>", self.on_note_double_click)
-        self.update_note_table()
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.update_task_table()
+        self.update_note_table()
         self.check_reminders()
 
     def set_today(self):
@@ -158,27 +150,6 @@ class PlannerApp:
             top.destroy()
 
         tk.Button(top, text="Подтвердить", command=set_date).pack(pady=5)
-
-    def add_task(self):
-        title = self.title_entry.get()
-        due_date = self.due_date_var.get()
-        category = self.category_var.get()
-        if due_date == "Дата не выбрана":
-            messagebox.showwarning("Ошибка", "Выберите дату!")
-            return
-        if not title:
-            messagebox.showwarning("Ошибка", "Введите название задачи!")
-            return
-        try:
-            datetime.strptime(due_date, "%Y-%m-%d %H:%M")
-            task = Task(title, due_date, category)
-            self.tasks.append(task)
-            self.update_task_table()
-            self.title_entry.delete(0, tk.END)
-            self.due_date_var.set("Дата не выбрана")
-            self.category_var.set("Без категории")
-        except ValueError:
-            messagebox.showerror("Ошибка", "Неверный формат даты!")
 
     def complete_task(self):
         try:
@@ -206,32 +177,69 @@ class PlannerApp:
 
             top = tk.Toplevel(self.root)
             top.title("Редактировать задачу")
-            top.geometry("600x500")
+            top.geometry("500x350")  # Оптимизированный размер окна
 
-            tk.Label(top, text="Название задачи:").pack(pady=5)
-            title_entry = tk.Entry(top, width=40)
+            # Основной фрейм с минимальными отступами
+            main_frame = tk.Frame(top, padx=10, pady=10)
+            main_frame.pack(expand=True, fill="both")
+
+            # Название задачи
+            tk.Label(main_frame, text="Название задачи:").grid(row=0, column=0, sticky="w", pady=5)
+            title_entry = tk.Entry(main_frame, width=50)
             title_entry.insert(0, current_task.title)
-            title_entry.pack(pady=5)
+            title_entry.grid(row=0, column=1, pady=5, sticky="w")
 
-            tk.Label(top, text="Срок выполнения:").pack(pady=5)
-            due_date_entry = tk.Entry(top, width=40)
+            # Срок выполнения
+            tk.Label(main_frame, text="Срок выполнения:").grid(row=1, column=0, sticky="w", pady=5)
+            due_date_entry = tk.Entry(main_frame, width=50)
             due_date_entry.insert(0, current_task.due_date)
-            due_date_entry.pack(pady=5)
+            due_date_entry.grid(row=1, column=1, pady=5, sticky="w")
 
-            tk.Label(top, text="Категория:").pack(pady=5)
+            # Категория и чекбоксы в одной строке
+            tk.Label(main_frame, text="Категория:").grid(row=2, column=0, sticky="w", pady=5)
+            category_frame = tk.Frame(main_frame)
+            category_frame.grid(row=2, column=1, pady=5, sticky="w")
+
             category_var = tk.StringVar(value=current_task.category)
-            tk.OptionMenu(top, category_var, *self.categories).pack(pady=5)
+            category_menu = tk.OptionMenu(category_frame, category_var, *self.categories)
+            category_menu.pack(side="left", padx=(0, 10))
 
-            tk.Label(top, text="Комментарий:").pack(pady=5)
-            comment_text = tk.Text(top, wrap="word", height=10)
-            comment_text.insert("1.0", current_task.comment)
-            comment_text.pack(pady=5, padx=10, expand=True, fill="both")
+            importance_var = tk.BooleanVar(
+                value=current_task.importance if hasattr(current_task, 'importance') else False)
+            urgency_var = tk.BooleanVar(value=current_task.urgency if hasattr(current_task, 'urgency') else False)
+            tk.Checkbutton(category_frame, text="Важно", variable=importance_var).pack(side="left", padx=5)
+            tk.Checkbutton(category_frame, text="Срочно", variable=urgency_var).pack(side="left", padx=5)
+
+            # Поле комментариев без метки, с подсказкой
+            comment_text = tk.Text(main_frame, wrap="word", height=8, width=60)
+            if current_task.comment:
+                comment_text.insert("1.0", current_task.comment)
+            else:
+                comment_text.insert("1.0", "комментарий")
+                comment_text.config(fg="grey")  # Серый цвет для подсказки
+
+                def clear_placeholder(event):
+                    if comment_text.get("1.0", tk.END).strip() == "комментарий":
+                        comment_text.delete("1.0", tk.END)
+                        comment_text.config(fg="black")
+
+                def restore_placeholder(event):
+                    if not comment_text.get("1.0", tk.END).strip():
+                        comment_text.insert("1.0", "комментарий")
+                        comment_text.config(fg="grey")
+
+                comment_text.bind("<FocusIn>", clear_placeholder)
+                comment_text.bind("<FocusOut>", restore_placeholder)
+            comment_text.grid(row=3, column=0, columnspan=2, pady=10, sticky="we")
 
             def save_edited_task():
                 new_title = title_entry.get().strip()
                 new_due_date = due_date_entry.get().strip()
                 new_category = category_var.get()
                 new_comment = comment_text.get("1.0", tk.END).strip()
+                new_importance = importance_var.get()
+                new_urgency = urgency_var.get()
+
                 if not new_title:
                     messagebox.showwarning("Ошибка", "Введите название задачи!")
                     return
@@ -240,13 +248,21 @@ class PlannerApp:
                     current_task.title = new_title
                     current_task.due_date = new_due_date
                     current_task.category = new_category
-                    current_task.comment = new_comment
+                    current_task.comment = new_comment if new_comment != "комментарий" else ""  # Убираем подсказку
+                    if hasattr(current_task, 'importance'):
+                        current_task.importance = new_importance
+                    if hasattr(current_task, 'urgency'):
+                        current_task.urgency = new_urgency
                     self.update_task_table()
+                    self.save_data()  # Сохранение данных
                     top.destroy()
                 except ValueError:
                     messagebox.showerror("Ошибка", "Неверный формат даты! Используйте YYYY-MM-DD HH:MM")
 
-            tk.Button(top, text="Сохранить", command=save_edited_task).pack(pady=10)
+            # Кнопка сохранения
+            tk.Button(main_frame, text="Сохранить", command=save_edited_task).grid(row=4, column=0, columnspan=2,
+                                                                                   pady=10)
+
         except IndexError:
             messagebox.showwarning("Ошибка", "Выберите задачу!")
 
@@ -327,19 +343,36 @@ class PlannerApp:
             messagebox.showwarning("Ошибка", "Выберите заметку!")
 
     def update_task_table(self):
-        self.task_tree.delete(*self.task_tree.get_children())
-        now = datetime.now()
+        for item in self.task_tree.get_children():
+            self.task_tree.delete(item)
         for task in self.tasks:
             status = "✓" if task.completed else "✗"
-            comment_status = "✓" if task.comment.strip() else ""
-            time_spent = f"{task.time_spent // 60}м {task.time_spent % 60}с" if task.time_spent > 0 else ""
-            due = datetime.strptime(task.due_date, "%Y-%m-%d %H:%M")
-            if not task.completed and due < now:
-                self.task_tree.insert("", "end", values=(
-                task.title, task.due_date, task.category, status, comment_status, time_spent), tags=("overdue",))
+            time_str = f"{task.time_spent // 60} мин {task.time_spent % 60} сек" if task.time_spent else ""
+            comment_symbol = "✎" if task.comment else ""
+            if task.importance and task.urgency:
+                priority = "1"  # Важно и Срочно
+                tag = "urgent_important"
+            elif task.importance and not task.urgency:
+                priority = "2"  # Важно, Не срочно
+                tag = "important"
+            elif not task.importance and task.urgency:
+                priority = "3"  # Не важно, Срочно
+                tag = "urgent"
             else:
-                self.task_tree.insert("", "end", values=(
-                task.title, task.due_date, task.category, status, comment_status, time_spent))
+                priority = "4"  # Не важно, Не срочно
+                tag = "not_important"
+
+            values = (task.title, task.due_date, task.category, status, comment_symbol, time_str, priority)
+            item = self.task_tree.insert("", "end", values=values, tags=(tag,))
+            if not task.completed and datetime.strptime(task.due_date, "%Y-%m-%d %H:%M") < datetime.now():
+                self.task_tree.item(item, tags=(tag, "overdue"))
+
+        # Мягкие цвета
+        self.task_tree.tag_configure("urgent_important", background="#ffcccc")  # Квадрант 1: Мягкий красный
+        self.task_tree.tag_configure("important", background="#ccffcc")  # Квадрант 2: Мягкий зелёный
+        self.task_tree.tag_configure("urgent", background="#ffcc99")  # Квадрант 3: Мягкий оранжевый
+        self.task_tree.tag_configure("not_important", background="#cce5ff")  # Квадрант 4: Мягкий голубой
+        self.task_tree.tag_configure("overdue", foreground="red")
 
     def update_note_table(self):
         self.note_tree.delete(*self.note_tree.get_children())
@@ -571,22 +604,19 @@ class PlannerApp:
 
     def save_data(self):
         data = {
-            "tasks": [{"title": t.title, "due_date": t.due_date, "category": t.category, "completed": t.completed,
-                       "comment": t.comment, "time_spent": t.time_spent} for t in self.tasks],
-            "notes": [{"text": n.text, "date": n.date, "category": n.category} for n in self.notes],
+            "tasks": [{"title": task.title, "due_date": task.due_date, "category": task.category,
+                       "comment": task.comment, "time_spent": task.time_spent, "completed": task.completed,
+                       "importance": task.importance, "urgency": task.urgency} for task in self.tasks],
+            "notes": [{"text": note.text, "date": note.date, "category": note.category} for note in self.notes],
             "categories": self.categories,
-            "free_time_entries": self.free_time_entries  # Добавляем свободные записи
+            "free_time_entries": self.free_time_entries
         }
-        if data["tasks"] or data["notes"] or data["categories"]:
-            if os.path.exists("tasks.json"):
-                shutil.copy("tasks.json", "tasks_backup.json")
-            try:
-                with open("tasks.json", "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False, indent=4)
-            except Exception as e:
-                messagebox.showerror("Ошибка", f"Не удалось сохранить данные: {e}")
-                if os.path.exists("tasks_backup.json"):
-                    shutil.copy("tasks_backup.json", "tasks.json")
+        with open("tasks.json", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        if not os.path.exists("tasks_backup.json") or os.path.getmtime("tasks.json") > os.path.getmtime(
+                "tasks_backup.json"):
+            with open("tasks_backup.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
 
     def load_data(self):
         try:
@@ -599,23 +629,16 @@ class PlannerApp:
                     self.free_time_entries = []
                 else:
                     data = json.loads(content)
-                    if isinstance(data, list):  # Старый формат
-                        self.tasks = [Task(t["title"], t["due_date"]) for t in data]
-                        for i, task in enumerate(self.tasks):
-                            task.completed = data[i]["completed"]
-                        self.notes = []
-                        self.categories = ["Без категории", "Работа", "Личное", "Срочное"]
-                        self.free_time_entries = []
-                    elif isinstance(data, dict):  # Новый формат
-                        self.tasks = [
-                            Task(t["title"], t["due_date"], t.get("category", "Без категории"), t.get("comment", ""),
-                                 t.get("time_spent", 0)) for t in data.get("tasks", [])]
-                        for i, task in enumerate(self.tasks):
-                            task.completed = data["tasks"][i]["completed"]
-                        self.notes = [Note(n["text"], n["date"], n.get("category", "Без категории")) for n in
-                                      data.get("notes", [])]
-                        self.categories = data.get("categories", ["Без категории", "Работа", "Личное", "Срочное"])
-                        self.free_time_entries = data.get("free_time_entries", [])
+                    self.tasks = [Task(t["title"], t["due_date"], t.get("category", "Без категории"),
+                                       t.get("comment", ""), t.get("time_spent", 0),
+                                       t.get("importance", False), t.get("urgency", False))
+                                  for t in data.get("tasks", [])]
+                    for i, task in enumerate(self.tasks):
+                        task.completed = data["tasks"][i]["completed"]
+                    self.notes = [Note(n["text"], n["date"], n.get("category", "Без категории"))
+                                  for n in data.get("notes", [])]
+                    self.categories = data.get("categories", ["Без категории", "Работа", "Личное", "Срочное"])
+                    self.free_time_entries = data.get("free_time_entries", [])
         except FileNotFoundError:
             self.tasks = []
             self.notes = []
@@ -626,23 +649,54 @@ class PlannerApp:
             self.notes = []
             self.categories = ["Без категории", "Работа", "Личное", "Срочное"]
             self.free_time_entries = []
-            if os.path.exists("tasks_backup.json"):
-                messagebox.showwarning("Внимание", "Основной файл повреждён, загружаю резервную копию.")
-                try:
-                    with open("tasks_backup.json", "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        if isinstance(data, dict):
-                            self.tasks = [Task(t["title"], t["due_date"], t.get("category", "Без категории"),
-                                               t.get("comment", ""), t.get("time_spent", 0)) for t in
-                                          data.get("tasks", [])]
-                            for i, task in enumerate(self.tasks):
-                                task.completed = data["tasks"][i]["completed"]
-                            self.notes = [Note(n["text"], n["date"], n.get("category", "Без категории")) for n in
-                                          data.get("notes", [])]
-                            self.categories = data.get("categories", ["Без категории", "Работа", "Личное", "Срочное"])
-                            self.free_time_entries = data.get("free_time_entries", [])
-                except Exception as e:
-                    messagebox.showerror("Ошибка", f"Не удалось загрузить резервную копию: {e}")
+
+    def save_data(self):
+        data = {
+            "tasks": [{"title": task.title, "due_date": task.due_date, "category": task.category,
+                       "comment": task.comment, "time_spent": task.time_spent, "completed": task.completed,
+                       "importance": task.importance, "urgency": task.urgency} for task in self.tasks],
+            "notes": [{"text": note.text, "date": note.date, "category": note.category} for note in self.notes],
+            "categories": self.categories,
+            "free_time_entries": self.free_time_entries
+        }
+        with open("tasks.json", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        if not os.path.exists("tasks_backup.json") or os.path.getmtime("tasks.json") > os.path.getmtime(
+                "tasks_backup.json"):
+            with open("tasks_backup.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+
+    def load_data(self):
+        try:
+            with open("tasks.json", "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if not content:
+                    self.tasks = []
+                    self.notes = []
+                    self.categories = ["Без категории", "Работа", "Личное", "Срочное"]
+                    self.free_time_entries = []
+                else:
+                    data = json.loads(content)
+                    self.tasks = [Task(t["title"], t["due_date"], t.get("category", "Без категории"),
+                                       t.get("comment", ""), t.get("time_spent", 0),
+                                       t.get("importance", False), t.get("urgency", False))
+                                  for t in data.get("tasks", [])]
+                    for i, task in enumerate(self.tasks):
+                        task.completed = data["tasks"][i]["completed"]
+                    self.notes = [Note(n["text"], n["date"], n.get("category", "Без категории"))
+                                  for n in data.get("notes", [])]
+                    self.categories = data.get("categories", ["Без категории", "Работа", "Личное", "Срочное"])
+                    self.free_time_entries = data.get("free_time_entries", [])
+        except FileNotFoundError:
+            self.tasks = []
+            self.notes = []
+            self.categories = ["Без категории", "Работа", "Личное", "Срочное"]
+            self.free_time_entries = []
+        except json.JSONDecodeError:
+            self.tasks = []
+            self.notes = []
+            self.categories = ["Без категории", "Работа", "Личное", "Срочное"]
+            self.free_time_entries = []
 
     def restore_from_backup(self):
         if os.path.exists("tasks_backup.json"):
@@ -736,6 +790,67 @@ class PlannerApp:
             top.destroy()
 
         tk.Button(top, text="Сохранить", command=save_category).pack(pady=10)
+
+    def add_task_window(self):
+        top = tk.Toplevel(self.root)
+        top.title("Добавить задачу")
+        top.geometry("420x320")  # Оптимизируем размер окна
+
+        # Используем grid для аккуратного размещения элементов
+        tk.Label(top, text="Название задачи:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        title_entry = tk.Entry(top, width=40)
+        title_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        tk.Label(top, text="Дата выполнения:").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        due_date_entry = DateEntry(top, width=20, date_pattern="yyyy-mm-dd")
+        due_date_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        tk.Label(top, text="Категория:").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        category_var = tk.StringVar(value="Без категории")
+        category_menu = tk.OptionMenu(top, category_var, *self.categories)
+        category_menu.grid(row=2, column=1, padx=10, pady=5, sticky="w")
+
+        tk.Label(top, text="Комментарий:").grid(row=3, column=0, sticky="nw", padx=10, pady=5)
+        comment_text = tk.Text(top, height=4, width=30)
+        comment_text.grid(row=3, column=1, padx=10, pady=5)
+
+        # Чекбоксы размещаем в одной строке
+        importance_var = tk.BooleanVar(value=False)
+        urgency_var = tk.BooleanVar(value=False)
+        checkbox_frame = tk.Frame(top)
+        checkbox_frame.grid(row=4, column=1, pady=10, sticky="w")
+
+        tk.Checkbutton(checkbox_frame, text="Важно", variable=importance_var).pack(side="left", padx=5)
+        tk.Checkbutton(checkbox_frame, text="Срочно", variable=urgency_var).pack(side="left", padx=5)
+
+        def save_task():
+            title = title_entry.get().strip()
+            due_date = due_date_entry.get()
+            category = category_var.get()
+            comment = comment_text.get("1.0", "end-1c").strip()
+            importance = importance_var.get()
+            urgency = urgency_var.get()
+
+            if not title or not due_date:
+                messagebox.showwarning("Ошибка", "Заполните название и дату!")
+                return
+
+            try:
+                date_obj = datetime.strptime(due_date, "%Y-%m-%d")
+                due_date_formatted = date_obj.replace(hour=23, minute=59).strftime("%Y-%m-%d %H:%M")
+            except ValueError:
+                messagebox.showwarning("Ошибка", "Неверный формат даты! Используйте ГГГГ-ММ-ДД")
+                return
+
+            new_task = Task(title, due_date_formatted, category, comment, 0, importance, urgency)
+            self.tasks.append(new_task)
+            self.update_task_table()
+            self.save_data()
+            top.destroy()
+
+        # Кнопка сохранения
+        tk.Button(top, text="Сохранить", command=save_task).grid(row=5, column=0, columnspan=2, pady=10)
+
 
 # Запуск приложения
 if __name__ == "__main__":

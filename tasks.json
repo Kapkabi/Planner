@@ -4,57 +4,101 @@
             "title": "Решить 2 задачи по пайтону",
             "due_date": "2025-03-24 10:20",
             "category": "Работа",
-            "completed": true,
             "comment": "",
-            "time_spent": 0
+            "time_spent": 0,
+            "completed": true,
+            "importance": false,
+            "urgency": false
         },
         {
             "title": "Поездка к зубному",
             "due_date": "2025-03-25 10:20",
             "category": "Срочное",
-            "completed": false,
             "comment": "",
-            "time_spent": 0
+            "time_spent": 0,
+            "completed": false,
+            "importance": false,
+            "urgency": false
         },
         {
             "title": "Дать объявления о сдаче в аренду квартир",
             "due_date": "2025-03-28 00:00",
             "category": "Работа",
-            "completed": false,
             "comment": "",
-            "time_spent": 0
+            "time_spent": 0,
+            "completed": false,
+            "importance": false,
+            "urgency": false
         },
         {
             "title": "Заказать батарейки для видеокамеры",
             "due_date": "2025-03-25 00:00",
             "category": "Личное",
-            "completed": false,
             "comment": "",
-            "time_spent": 0
+            "time_spent": 0,
+            "completed": false,
+            "importance": true,
+            "urgency": false
         },
         {
             "title": "Багаж Шахов",
             "due_date": "2025-03-25 00:00",
             "category": "Работа",
-            "completed": false,
             "comment": "тестовый комментарий",
-            "time_spent": 0
+            "time_spent": 0,
+            "completed": false,
+            "importance": false,
+            "urgency": false
         },
         {
             "title": "тестовая задача",
             "due_date": "2025-03-24 21:22",
             "category": "Срочное",
-            "completed": false,
             "comment": "Это тестовая задача",
-            "time_spent": 0
+            "time_spent": 0,
+            "completed": false,
+            "importance": false,
+            "urgency": true
         },
         {
             "title": "Подать показания эл.энергии",
             "due_date": "2025-03-25 00:00",
             "category": "Срочное",
-            "completed": false,
             "comment": "",
-            "time_spent": 0
+            "time_spent": 0,
+            "completed": false,
+            "importance": false,
+            "urgency": false
+        },
+        {
+            "title": "Купить нормальный шокер на алиэкспрессе",
+            "due_date": "2025-03-28 00:00",
+            "category": "Личное",
+            "comment": "",
+            "time_spent": 0,
+            "completed": false,
+            "importance": false,
+            "urgency": true
+        },
+        {
+            "title": "Работка над программой планировщик",
+            "due_date": "2025-03-28 00:00",
+            "category": "Без категории",
+            "comment": "Циклические задачи\nФильт актинвых задач",
+            "time_spent": 0,
+            "completed": false,
+            "importance": false,
+            "urgency": false
+        },
+        {
+            "title": "жжж",
+            "due_date": "2025-03-28 23:59",
+            "category": "Без категории",
+            "comment": "",
+            "time_spent": 0,
+            "completed": false,
+            "importance": true,
+            "urgency": false
         }
     ],
     "notes": [

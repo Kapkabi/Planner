@@ -1,0 +1,92 @@
+def __init__(self, root):
+    self.root = root
+    self.root.title("Планировщик дел")
+    self.root.minsize(700, 600)
+    self.tasks = []
+    self.notes = []
+    self.categories = ["Без категории", "Работа", "Личное", "Срочное"]
+    self.free_time_entries = []
+    self.current_task = None
+    self.load_data()
+
+    self.root.grid_columnconfigure(0, weight=1)
+    self.root.grid_columnconfigure(1, weight=1)
+    self.root.grid_columnconfigure(2, weight=1)
+    self.root.grid_columnconfigure(3, weight=1)
+
+    # Поиск
+    tk.Label(root, text="Поиск:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+    self.search_entry = tk.Entry(root)
+    self.search_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+    tk.Button(root, text="Найти", command=self.search).grid(row=0, column=2, padx=5, pady=5)
+    tk.Button(root, text="Показать всё", command=self.reset_search).grid(row=0, column=3, padx=5, pady=5)
+
+    # Таблица задач
+    self.task_tree = ttk.Treeview(root, columns=("Title", "Due Date", "Category", "Status", "Comment", "Time", "Priority"),
+                                  show="headings", height=10)
+    self.task_tree.heading("Title", text="Задача")
+    self.task_tree.heading("Due Date", text="Срок")
+    self.task_tree.heading("Category", text="Категория")
+    self.task_tree.heading("Status", text="Статус")
+    self.task_tree.heading("Comment", text="Комментарий")
+    self.task_tree.heading("Time", text="Время")
+    self.task_tree.heading("Priority", text="Приоритет")  # Новая колонка
+    self.task_tree.column("Title", width=250, stretch=True)
+    self.task_tree.column("Due Date", width=150, stretch=True)
+    self.task_tree.column("Category", width=120, stretch=True)
+    self.task_tree.column("Status", width=80, stretch=True)
+    self.task_tree.column("Comment", width=50, stretch=True)
+    self.task_tree.column("Time", width=100, stretch=True)
+    self.task_tree.column("Priority", width=80, anchor="center")  # Новая колонка
+    self.task_tree.grid(row=1, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
+    self.task_tree.tag_configure("overdue", foreground="red")
+    self.task_tree.bind("<Double-1>", self.on_task_double_click)
+
+    # Кнопки для задач
+    tk.Button(root, text="Добавить задачу", command=self.add_task_window).grid(row=2, column=0, padx=5, pady=5)
+    tk.Button(root, text="Отметить выполненной", command=self.complete_task).grid(row=2, column=1, padx=5, pady=5)
+    tk.Button(root, text="Удалить задачу", command=self.delete_task).grid(row=2, column=2, padx=5, pady=5)
+    tk.Button(root, text="Комментарий", command=self.edit_task_comment).grid(row=2, column=3, padx=5, pady=5)
+
+    # Таймер Помидоро
+    tk.Button(root, text="Запустить таймер", command=self.start_pomodoro).grid(row=3, column=0, padx=5, pady=5)
+    tk.Button(root, text="Статистика таймера", command=self.show_pomodoro_stats).grid(row=3, column=1, padx=5, pady=5)
+
+    self.timer_running = False
+    self.timer_paused = False
+    self.pomodoro_cycles = 0
+    self.work_seconds = 0
+    self.rest_seconds = 0
+    self.long_break_seconds = 15 * 60
+    self.original_work_seconds = 25 * 60
+    self.original_rest_seconds = 5 * 60
+    self.is_work_phase = True
+    self.work_time_spent = 0
+    self.total_work_time = 0
+
+    # Настройка напоминаний
+    tk.Label(root, text="Напоминание за:").grid(row=3, column=2, padx=5, pady=5, sticky="e")
+    self.reminder_var = tk.StringVar(value="10")
+    tk.OptionMenu(root, self.reminder_var, "5", "10", "30", "60").grid(row=3, column=3, padx=5, pady=5, sticky="w")
+
+    # Заметки
+    tk.Button(root, text="Добавить заметку", command=self.open_note_window).grid(row=4, column=0, padx=5, pady=5)
+    tk.Button(root, text="Редактировать заметку", command=self.edit_note).grid(row=4, column=1, padx=5, pady=5)
+    tk.Button(root, text="Удалить заметку", command=self.delete_note).grid(row=4, column=2, padx=5, pady=5)
+    tk.Button(root, text="Восстановить из резерва", command=self.restore_from_backup).grid(row=5, column=0, padx=5, pady=5)
+    tk.Button(root, text="Экспорт в CSV", command=self.export_to_csv).grid(row=5, column=1, padx=5, pady=5)
+
+    self.note_tree = ttk.Treeview(root, columns=("Title", "Date", "Category"), show="headings", height=5)
+    self.note_tree.heading("Title", text="Заголовок заметки")
+    self.note_tree.heading("Date", text="Дата")
+    self.note_tree.heading("Category", text="Категория")
+    self.note_tree.column("Title", width=450, stretch=True)
+    self.note_tree.column("Date", width=150, stretch=True)
+    self.note_tree.column("Category", width=150, stretch=True)
+    self.note_tree.grid(row=6, column=0, columnspan=4, padx=5, pady=5, sticky="ew")
+    self.note_tree.bind("<Double-1>", self.on_note_double_click)
+
+    self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+    self.update_task_table()
+    self.update_note_table()
+    self.check_reminders()
